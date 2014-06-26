@@ -95,7 +95,7 @@ namespace wIRC.IRC
             _listenerThread.Join();
             _client.Close();
             State = ConnectionState.Disconnected;
-            IrcUtils.WriteOutput("Disconnecting\r\n");
+            IrcUtils.WriteOutput("Disconnected\r\n");
         }
 
         public void Idle()
@@ -184,17 +184,21 @@ namespace wIRC.IRC
     {
         public TcpClient TcpClient { get; set; }
         public WIrcClient IrcClient { get; set; }
-        private static readonly Byte[] ReadBuffer = new byte[1024];
 
         public async void Listen()
         {
+            if (IrcClient == null || TcpClient == null)
+            {
+                throw new NullReferenceException("IrcClient or TcpClient is null");
+            }
+
+            var reader = new StreamReader(TcpClient.GetStream());
+
             while (true)
             {
                 if (!TcpClient.Connected)
                     throw new InvalidProgramException("Listener lost connection");
 
-                var networkStream = TcpClient.GetStream();
-                var reader = new StreamReader(networkStream);
                 var response = await reader.ReadLineAsync();
                 if (response != null)
                 {
