@@ -51,7 +51,21 @@ namespace wIRC.IRC
             }
         }
 
-        public String Nick { get; set; }
+        private string _nick;
+
+        public String Nick
+        {
+            get { return _nick; }
+            set
+            {
+                if (value == null) throw new ArgumentNullException("value");
+                _nick = value;
+                if (State.Equals(ConnectionState.Connected))
+                {
+                    ChangeNick(_nick);
+                }
+            }
+        }
 
         public WIrcClient(String endpoint, int port)
         {
@@ -72,19 +86,15 @@ namespace wIRC.IRC
             _listenerThread.Start();
         }
 
-        private void SendPass()
+        private void SendConnectInfo()
         {
             _client.SendCommand(String.Format("PASS {0}", Guid.NewGuid()));
-        }
-
-        private void SendUser()
-        {
             _client.SendCommand(String.Format("USER {0} 0 * :No Name Hear", Nick));
         }
 
-        private void SendNick()
+        private void ChangeNick(string nick)
         {
-            _client.SendCommand(String.Format("NICK {0}", Nick));
+            _client.SendCommand(String.Format("NICK {0}", nick));
         }
 
         public void Disconnect()
@@ -97,7 +107,7 @@ namespace wIRC.IRC
             State = ConnectionState.Disconnected;
             IrcUtils.WriteOutput("Disconnected\r\n");
         }
-        
+
         public void HandleResponse(string response)
         {
             if (string.IsNullOrWhiteSpace(response))
@@ -107,11 +117,11 @@ namespace wIRC.IRC
             switch (parsedResponse.Command)
             {
                 case "020":
-                    SendPass();
-                    SendNick();
-                    SendUser();
+                    SendConnectInfo();
+                    ChangeNick(Nick);
                     break;
                 case "001":
+                    State = ConnectionState.Connected;
                     const string channel = "#test";
                     Join(channel);
                     break;
@@ -164,20 +174,29 @@ namespace wIRC.IRC
             var parts = commandString.Substring(1, commandString.Length - 2).Split();
             var ctcpCommand = parts[0];
             var args = parts.Skip(1);
-            switch (ctcpCommand)
+            CTCP ctcp;
+
+            try
             {
-                case "PING":
+                ctcp = (CTCP) Enum.Parse(typeof (CTCP), ctcpCommand, false);
+            }
+            catch (ArgumentException ex)
+            {
+                IrcUtils.WriteOutput("CTCP command {0} not supported yet", ctcpCommand);
+                return;
+            }
+
+            switch (ctcp)
+            {
+                case CTCP.PING:
                     SendCtcpReply(parsedResponse.Source, string.Format("PING {0}", args.First()));
                     break;
-                case "VERSION":
+                case CTCP.VERSION:
                     var assemly = Assembly.GetEntryAssembly().GetName();
                     var name = assemly.Name;
                     var version = assemly.Version;
                     var env = string.Format("C# .NET {0} on {1}", Environment.Version, Environment.OSVersion);
                     SendCtcpReply(parsedResponse.Source, string.Format("VERSION {0} {1} under {2}", name, version, env));
-                    break;
-                default:
-                    IrcUtils.WriteOutput("CTCP command {0} not supported yet", ctcpCommand);
                     break;
             }
         }

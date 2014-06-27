@@ -16,7 +16,7 @@ namespace wIRC.Util
                 throw new InvalidProgramException("Not connected");
             }
             command += Constants.Crlf;
-            Debug.WriteLine(string.Format("<OUT> {0}", command));
+            Debug.Write(string.Format("<OUT> {0}", command));
             if (!silent)
                 IrcUtils.WriteOutput(command);
             var s = client.GetStream();
