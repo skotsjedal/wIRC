@@ -97,12 +97,7 @@ namespace wIRC.IRC
             State = ConnectionState.Disconnected;
             IrcUtils.WriteOutput("Disconnected\r\n");
         }
-
-        public void Idle()
-        {
-            Thread.Sleep(500);
-        }
-
+        
         public void HandleResponse(string response)
         {
             if (string.IsNullOrWhiteSpace(response))
