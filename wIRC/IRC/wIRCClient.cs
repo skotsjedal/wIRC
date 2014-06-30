@@ -259,8 +259,8 @@ namespace wIRC.IRC
         public void Message(string target, string message)
         {
             _activeTarget = target;
-            _client.SendCommand(String.Format("PRIVMSG {0} {1}", target, message), true);
-            IrcUtils.WriteOutput(String.Format("<{0}> {1}\r\n", Nick, message));
+            _client.SendCommand(String.Format("PRIVMSG {0} :{1}", target, message), true);
+            //IrcUtils.WriteOutput(String.Format("<{0}> {1}\r\n", Nick, message));
         }
 
         public void Chat(string message)

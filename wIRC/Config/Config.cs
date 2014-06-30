@@ -98,12 +98,19 @@ namespace wIRC.Config
         }
 
         [ConfigurationProperty("channels", IsRequired = false)]
-        public List<String> Channels
+        public string Channels
         {
             get
             {
-                var s = base["channels"] as string;
-                return s != null ? s.Split(new char[';']).ToList() : new List<string>();
+                return base["channels"] as string;
+            }
+        }
+
+        public List<string> ChannelsList
+        {
+            get
+            {
+                return Channels != null ? Channels.Split(new char[';']).ToList() : new List<string>();
             }
         }
     }

@@ -27,7 +27,7 @@ namespace wIRC
                 {
                     Nick = server.Nick,
                     Name = server.Name,
-                    AutoJoinChannels = server.Channels
+                    AutoJoinChannels = server.ChannelsList
                 };
                 wIrcClient.Connect();
                 _active = wIrcClient;
