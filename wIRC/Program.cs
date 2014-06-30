@@ -63,11 +63,15 @@ namespace wIRC
                     }
                     continue;
                 }
+
+                // Raw message to the server
                 if (input[0] == '|')
                 {
                     _active.Send(input.Substring(1));
                     continue;
                 }
+
+                // Default chat to current active target
                 _active.Chat(input);
             }
 

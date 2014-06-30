@@ -43,6 +43,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="IRC\ConnectionListener.cs" />
+    <Compile Include="IRC\CtcpHandler.cs" />
     <Compile Include="IRC\wIRCClient.cs" />
     <Compile Include="Models\Enums.cs" />
     <Compile Include="Models\IrcModels.cs" />

@@ -15,7 +15,8 @@ namespace wIRC.IRC
     {
         Disconnected,
         Connecting,
-        Connected
+        Connected,
+        Disconnecting
     }
 
     public class WIrcClient
@@ -26,6 +27,11 @@ namespace wIRC.IRC
         public ConnectionState State
         {
             get { return _state; }
+            private set
+            {
+                Debug.WriteLine("State for {0} changed from {1} to {2}", Name, State, value);
+                _state = value;
+            }
         }
 
         private TcpClient _client;
@@ -80,25 +86,28 @@ namespace wIRC.IRC
         public string Name { get; set; }
         public List<String> AutoJoinChannels { get; set; }
 
+        public CtcpHandler CtcpHandler { get; private set; }
+
         public WIrcClient(String endpoint, int port)
         {
             Nick = Conf.IrcConfig.DefaultNick;
             Endpoint = endpoint;
             Port = port;
-            _state = ConnectionState.Disconnected;
+            State = ConnectionState.Disconnected;
         }
 
         public void Connect()
         {
-            IrcUtils.WriteOutput("Connecting to {0}\r\n", Name);
+            IrcUtils.WriteOutputLine("Connecting to {0}", Name);
             _client = new TcpClient(Endpoint, Port);
-            _state = ConnectionState.Connecting;
+            CtcpHandler = new CtcpHandler(_client);
+            State = ConnectionState.Connecting;
 
             var listener = new ConnectionListener {TcpClient = _client, IrcClient = this};
 
             _listenerThread = new Thread(listener.Listen);
             _listenerThread.Start();
-            
+
             SendConnectInfo();
             ChangeNick(Nick);
         }
@@ -118,17 +127,19 @@ namespace wIRC.IRC
         {
             if (State.Equals(ConnectionState.Disconnected))
                 return;
-            IrcUtils.WriteOutput("Disconnecting\r\n");
+
+            State = ConnectionState.Disconnecting;
+            IrcUtils.WriteOutputLine("Disconnecting");
             var command = "QUIT";
             if (!String.IsNullOrWhiteSpace(message))
-                command += string.Format(" {0}", message);
+                command += string.Format(" :{0}", message);
             _client.SendCommand(command);
 
             _listenerThread.Abort();
             _listenerThread.Join();
             _client.Close();
-            _state = ConnectionState.Disconnected;
-            IrcUtils.WriteOutput("Disconnected\r\n");
+            State = ConnectionState.Disconnected;
+            IrcUtils.WriteOutputLine("Disconnected");
         }
 
         public void HandleResponse(string response)
@@ -143,33 +154,43 @@ namespace wIRC.IRC
                     Debug.WriteLine("Connection established");
                     break;
                 case "001":
-                    _state = ConnectionState.Connected;
+                    State = ConnectionState.Connected;
                     foreach (var channel in AutoJoinChannels)
                     {
-                        Join(channel);    
+                        Join(channel);
                     }
                     break;
                 case "NOTICE":
                     if (parsedResponse.Args.Last()[0] == 1)
                     {
-                        HandleCtcpReply(parsedResponse);
+                        CtcpHandler.HandleCtcpReply(parsedResponse);
                         break;
                     }
-
-                {
-                    IrcUtils.WriteOutput("-{0}- {1}", parsedResponse.Nick, parsedResponse.Args.Last());
-                }
+                    {
+                        var target = parsedResponse.Args.First();
+                        if (target.Equals(Nick))
+                        {
+                            IrcUtils.WriteOutput("-{0}- {1}", parsedResponse.Nick, parsedResponse.Args.Last());
+                            break;
+                        }
+                        IrcUtils.WriteOutput("-{0}:{1}- {2}", parsedResponse.Nick, target, parsedResponse.Args.Last());
+                    }
                     break;
                 case "PRIVMSG":
                     if (parsedResponse.Args.Last()[0] == 1)
                     {
-                        HandleCtcp(parsedResponse);
+                        CtcpHandler.HandleCtcpRequest(parsedResponse);
                         break;
                     }
-
-                {
-                    IrcUtils.WriteOutput("<{0}> {1}", parsedResponse.Nick, parsedResponse.Args.Last());
-                }
+                    {
+                        var target = parsedResponse.Args.First();
+                        if (target.Equals(Nick))
+                        {
+                            IrcUtils.WriteOutput("*{0}* {1}", parsedResponse.Nick, parsedResponse.Args.Last());
+                            break;
+                        }
+                        IrcUtils.WriteOutput("{0} <{1}> {2}", target, parsedResponse.Nick, parsedResponse.Args.Last());
+                    }
                     break;
                 case "421":
                     IrcUtils.WriteOutput(parsedResponse.Args.Last());
@@ -180,66 +201,18 @@ namespace wIRC.IRC
                 case "JOIN":
                     _activeTarget = parsedResponse.Args.First();
                     break;
+                case "ERROR":
+                    if (parsedResponse.Args.First().StartsWith("Closing Link"))
+                    {
+                        IrcUtils.WriteOutputLine("Client disconnected from {0}", Name);
+                        break;
+                    }
+                    IrcUtils.WriteOutputLine("{0}", parsedResponse.Response);
+                    break;
                 default:
-                    IrcUtils.WriteOutput("{0}\r\n", parsedResponse.Response);
+                    IrcUtils.WriteOutputLine("{0}", parsedResponse.Response);
                     break;
             }
-        }
-
-        private void HandleCtcpReply(IrcResponse parsedResponse)
-        {
-            // TODO
-            IrcUtils.WriteOutput("{0}\r\n", parsedResponse.Response);
-        }
-
-        private void HandleCtcp(IrcResponse parsedResponse)
-        {
-            var commandString = parsedResponse.Args.Last();
-
-            var parts = commandString.Substring(1, commandString.Length - 2).Split();
-            var ctcpCommand = parts[0];
-            var args = parts.Skip(1);
-            CTCP ctcp;
-
-            try
-            {
-                ctcp = (CTCP) Enum.Parse(typeof (CTCP), ctcpCommand, false);
-            }
-            catch (ArgumentException ex)
-            {
-                IrcUtils.WriteOutput("CTCP command {0} not supported yet", ctcpCommand);
-                return;
-            }
-
-            switch (ctcp)
-            {
-                case CTCP.PING:
-                    SendCtcpReply(parsedResponse.Nick, string.Format("PING {0}", string.Join(" ", args)));
-                    break;
-                case CTCP.VERSION:
-                    var assemly = Assembly.GetEntryAssembly().GetName();
-                    var name = assemly.Name;
-                    var version = assemly.Version;
-                    var env = string.Format("C# .NET {0} on {1}", Environment.Version, Environment.OSVersion);
-                    SendCtcpReply(parsedResponse.Nick, string.Format("VERSION {0} {1} under {2}", name, version, env));
-                    break;
-            }
-        }
-
-        public void SendCtcpRequest(string destination, string command)
-        {
-            SendCtcp("PRIVMSG", destination, command);
-        }
-
-        public void SendCtcpReply(string destination, string command)
-        {
-            SendCtcp("NOTICE", destination, command);
-        }
-
-        private void SendCtcp(string type, string destination, string command)
-        {
-            var message = string.Format("{3} {0} :{2}{1}{2}", destination, command, Constants.X01, type);
-            _client.SendCommand(message);
         }
 
         private void Join(string channel)
@@ -260,19 +233,25 @@ namespace wIRC.IRC
         {
             _activeTarget = target;
             _client.SendCommand(String.Format("PRIVMSG {0} :{1}", target, message), true);
-            //IrcUtils.WriteOutput(String.Format("<{0}> {1}\r\n", Nick, message));
         }
 
         public void Chat(string message)
         {
             if (String.IsNullOrWhiteSpace(_activeTarget))
-                IrcUtils.WriteOutput("Not in a channel or query\r\n");
+                IrcUtils.WriteOutputLine("Not in a channel or query");
             Message(_activeTarget, message);
         }
 
         public static void Disconnect(WIrcClient client)
         {
             client.Disconnect();
+        }
+
+        public void SendCtcpRequest(string destination, string command)
+        {
+            if (!State.Equals(ConnectionState.Connected))
+                return;
+            CtcpHandler.SendCtcpRequest(destination, command);
         }
     }
 }

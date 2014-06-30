@@ -15,7 +15,7 @@ namespace wIRC.Config
 
     public class IrcConfig : ConfigurationSection
     {
-        [ConfigurationProperty("defaultNick")]
+        [ConfigurationProperty("defaultNick", IsRequired = true)]
         public string DefaultNick
         {
             get { return base["defaultNick"] as string; }
@@ -100,18 +100,12 @@ namespace wIRC.Config
         [ConfigurationProperty("channels", IsRequired = false)]
         public string Channels
         {
-            get
-            {
-                return base["channels"] as string;
-            }
+            get { return base["channels"] as string; }
         }
 
         public List<string> ChannelsList
         {
-            get
-            {
-                return Channels != null ? Channels.Split(new char[';']).ToList() : new List<string>();
-            }
+            get { return Channels != null ? Channels.Split(new char[';']).ToList() : new List<string>(); }
         }
     }
 }

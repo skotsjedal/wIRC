@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
+using System.Threading;
 using wIRC.Util;
 
 namespace wIRC.IRC
@@ -27,6 +28,7 @@ namespace wIRC.IRC
                         break;
 
                     var response = await reader.ReadLineAsync();
+
                     if (response != null)
                     {
                         Debug.WriteLine(string.Format("<INN> {0}", response));
@@ -36,14 +38,14 @@ namespace wIRC.IRC
                     {
                         break;
                     }
-
                 }
             }
-            catch (ObjectDisposedException ex)
+            catch (ThreadAbortException ex)
             {
-                IrcUtils.WriteOutput("Listener closed");
+                IrcUtils.WriteOutputLine("Listener: Client shut down connection");
+                return;
             }
-            IrcUtils.WriteOutput("Client lost connection or called quit");
+            IrcUtils.WriteOutputLine("Listener: Client lost connection");
         }
     }
 }

@@ -40,9 +40,19 @@ namespace wIRC.Util
             Console.Write(output);
         }
 
+        public static void WriteOutputLine(string output)
+        {
+            WriteOutput(output+Environment.NewLine);
+        }
+
         public static void WriteOutput(string output, params object[] values)
         {
             Console.WriteLine(output, values);
+        }
+
+        public static void WriteOutputLine(string output, params object[] values)
+        {
+            WriteOutput(output + Environment.NewLine, values);
         }
 
         public static void PrintRaw(string text)
