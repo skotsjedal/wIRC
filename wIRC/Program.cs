@@ -19,7 +19,7 @@ namespace wIRC
 
             foreach (Server server in Conf.IrcConfig.Servers)
             {
-                var wIrcClient = new WIrcClient(server.Endpoint, server.Port) {Nick = server.Nick};
+                var wIrcClient = new WIrcClient(server.Endpoint, server.Port) {Nick = server.Nick, Name = server.Name};
                 wIrcClient.Connect();
                 _active = wIrcClient;
                 _clients.Add(wIrcClient);
@@ -36,6 +36,9 @@ namespace wIRC
                     var command = parts[0].Substring(1);
                     switch (command)
                     {
+                        case "msg":
+                            _active.Message(parts.ElementAt(1), string.Join(" ", parts.Skip(2)));
+                            break;
                         case "ctcp":
                             _active.SendCtcpRequest(parts.ElementAt(1), string.Join(" ", parts.Skip(2)));
                             break;
@@ -46,12 +49,17 @@ namespace wIRC
                             _active.Disconnect(string.Join(" ", parts.Skip(1)));
                             break;
                         default:
-                            IrcUtils.WriteOutput("Unknown command {0}", command);
+                            IrcUtils.WriteOutput("Unknown command {0}\r\n", command);
                             break;
                     }
                     continue;
                 }
-                _active.Send(input);
+                if (input[0] == '§')
+                {
+                    _active.Send(input.Substring(1));
+                    continue;
+                }
+                _active.Chat(input);
             }
 
             _clients.ForEach(WIrcClient.Disconnect);

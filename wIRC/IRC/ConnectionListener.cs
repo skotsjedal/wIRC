@@ -23,7 +23,7 @@ namespace wIRC.IRC
             while (true)
             {
                 if (!TcpClient.Connected)
-                    throw new InvalidProgramException("Listener lost connection");
+                    break;
 
                 var response = await reader.ReadLineAsync();
                 if (response != null)
