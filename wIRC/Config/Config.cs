@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Configuration;
+using System.Linq;
 
 namespace wIRC.Config
 {
@@ -93,6 +95,16 @@ namespace wIRC.Config
         public string Nick
         {
             get { return base["nick"] as string; }
+        }
+
+        [ConfigurationProperty("channels", IsRequired = false)]
+        public List<String> Channels
+        {
+            get
+            {
+                var s = base["channels"] as string;
+                return s != null ? s.Split(new char[';']).ToList() : new List<string>();
+            }
         }
     }
 }

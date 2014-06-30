@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net.Sockets;
 using System.Reflection;
@@ -76,6 +78,7 @@ namespace wIRC.IRC
         }
 
         public string Name { get; set; }
+        public List<String> AutoJoinChannels { get; set; }
 
         public WIrcClient(String endpoint, int port)
         {
@@ -95,6 +98,9 @@ namespace wIRC.IRC
 
             _listenerThread = new Thread(listener.Listen);
             _listenerThread.Start();
+            
+            SendConnectInfo();
+            ChangeNick(Nick);
         }
 
         private void SendConnectInfo()
@@ -134,13 +140,14 @@ namespace wIRC.IRC
             switch (parsedResponse.Command)
             {
                 case "020":
-                    SendConnectInfo();
-                    ChangeNick(Nick);
+                    Debug.WriteLine("Connection established");
                     break;
                 case "001":
                     _state = ConnectionState.Connected;
-                    const string channel = "#test";
-                    Join(channel);
+                    foreach (var channel in AutoJoinChannels)
+                    {
+                        Join(channel);    
+                    }
                     break;
                 case "NOTICE":
                     if (parsedResponse.Args.Last()[0] == 1)
@@ -150,8 +157,7 @@ namespace wIRC.IRC
                     }
 
                 {
-                    var nick = new string(parsedResponse.Source.TakeWhile(c => c != '!' && c != '@').ToArray());
-                    IrcUtils.WriteOutput("-{0}- {1}", nick, parsedResponse.Args.Last());
+                    IrcUtils.WriteOutput("-{0}- {1}", parsedResponse.Nick, parsedResponse.Args.Last());
                 }
                     break;
                 case "PRIVMSG":
@@ -162,8 +168,7 @@ namespace wIRC.IRC
                     }
 
                 {
-                    var nick = new string(parsedResponse.Source.TakeWhile(c => c != '!' && c != '@').ToArray());
-                    IrcUtils.WriteOutput("<{0}> {1}", nick, parsedResponse.Args.Last());
+                    IrcUtils.WriteOutput("<{0}> {1}", parsedResponse.Nick, parsedResponse.Args.Last());
                 }
                     break;
                 case "421":
@@ -209,14 +214,14 @@ namespace wIRC.IRC
             switch (ctcp)
             {
                 case CTCP.PING:
-                    SendCtcpReply(parsedResponse.Source, string.Format("PING {0}", string.Join(" ", args)));
+                    SendCtcpReply(parsedResponse.Nick, string.Format("PING {0}", string.Join(" ", args)));
                     break;
                 case CTCP.VERSION:
                     var assemly = Assembly.GetEntryAssembly().GetName();
                     var name = assemly.Name;
                     var version = assemly.Version;
                     var env = string.Format("C# .NET {0} on {1}", Environment.Version, Environment.OSVersion);
-                    SendCtcpReply(parsedResponse.Source, string.Format("VERSION {0} {1} under {2}", name, version, env));
+                    SendCtcpReply(parsedResponse.Nick, string.Format("VERSION {0} {1} under {2}", name, version, env));
                     break;
             }
         }
@@ -261,7 +266,7 @@ namespace wIRC.IRC
         public void Chat(string message)
         {
             if (String.IsNullOrWhiteSpace(_activeTarget))
-                IrcUtils.PrintRaw("Not in a channel or query\r\n");
+                IrcUtils.WriteOutput("Not in a channel or query\r\n");
             Message(_activeTarget, message);
         }
 

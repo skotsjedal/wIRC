@@ -19,23 +19,29 @@ namespace wIRC.IRC
             }
 
             var reader = new StreamReader(TcpClient.GetStream());
-
-            while (true)
+            try
             {
-                if (!TcpClient.Connected)
-                    break;
-
-                var response = await reader.ReadLineAsync();
-                if (response != null)
+                while (true)
                 {
-                    Debug.WriteLine(string.Format("<INN> {0}", response));
-                    IrcClient.HandleResponse(response);
-                }
-                else
-                {
-                    break;
-                }
+                    if (!TcpClient.Connected)
+                        break;
 
+                    var response = await reader.ReadLineAsync();
+                    if (response != null)
+                    {
+                        Debug.WriteLine(string.Format("<INN> {0}", response));
+                        IrcClient.HandleResponse(response);
+                    }
+                    else
+                    {
+                        break;
+                    }
+
+                }
+            }
+            catch (ObjectDisposedException ex)
+            {
+                IrcUtils.WriteOutput("Listener closed");
             }
             IrcUtils.WriteOutput("Client lost connection or called quit");
         }

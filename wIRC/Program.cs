@@ -1,7 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Threading;
 using wIRC.Config;
 using wIRC.IRC;
 using wIRC.Util;
@@ -16,10 +20,15 @@ namespace wIRC
         private static void Main(string[] args)
         {
             var running = true;
-
+            
             foreach (Server server in Conf.IrcConfig.Servers)
             {
-                var wIrcClient = new WIrcClient(server.Endpoint, server.Port) {Nick = server.Nick, Name = server.Name};
+                var wIrcClient = new WIrcClient(server.Endpoint, server.Port)
+                {
+                    Nick = server.Nick,
+                    Name = server.Name,
+                    AutoJoinChannels = server.Channels
+                };
                 wIrcClient.Connect();
                 _active = wIrcClient;
                 _clients.Add(wIrcClient);
@@ -54,7 +63,7 @@ namespace wIRC
                     }
                     continue;
                 }
-                if (input[0] == '§')
+                if (input[0] == '|')
                 {
                     _active.Send(input.Substring(1));
                     continue;
