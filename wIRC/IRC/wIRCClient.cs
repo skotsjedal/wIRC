@@ -3,6 +3,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Threading;
+using wIRC.Config;
 using wIRC.Models;
 using wIRC.Util;
 
@@ -45,7 +46,7 @@ namespace wIRC.IRC
             {
                 if (!State.Equals(ConnectionState.Disconnected))
                 {
-                    throw new InvalidOperationException("Cannot change port unless disconnected");
+                    throw new InvalidOperationException("Cannot change Port unless disconnected");
                 }
                 _port = value;
             }
@@ -58,7 +59,7 @@ namespace wIRC.IRC
             get { return _nick; }
             set
             {
-                if (value == null) throw new ArgumentNullException("value");
+                if (string.IsNullOrWhiteSpace(value)) return;
                 _nick = value;
                 if (State.Equals(ConnectionState.Connected))
                 {
@@ -69,6 +70,7 @@ namespace wIRC.IRC
 
         public WIrcClient(String endpoint, int port)
         {
+            Nick = Conf.IrcConfig.DefaultNick;
             Endpoint = endpoint;
             Port = port;
             State = ConnectionState.Disconnected;
@@ -97,10 +99,16 @@ namespace wIRC.IRC
             _client.SendCommand(String.Format("NICK {0}", nick));
         }
 
-        public void Disconnect()
+        public void Disconnect(string message = null)
         {
+            if (State.Equals(ConnectionState.Disconnected))
+                return;
             IrcUtils.WriteOutput("Disconnecting\r\n");
-            _client.SendCommand("QUIT");
+            var command = "QUIT";
+            if (!String.IsNullOrWhiteSpace(message))
+                command += string.Format(" {0}", message);
+            _client.SendCommand(command);
+
             _listenerThread.Abort();
             _listenerThread.Join();
             _client.Close();
@@ -189,7 +197,7 @@ namespace wIRC.IRC
             switch (ctcp)
             {
                 case CTCP.PING:
-                    SendCtcpReply(parsedResponse.Source, string.Format("PING {0}", args.First()));
+                    SendCtcpReply(parsedResponse.Source, string.Format("PING {0}", string.Join(" ", args)));
                     break;
                 case CTCP.VERSION:
                     var assemly = Assembly.GetEntryAssembly().GetName();
@@ -229,6 +237,11 @@ namespace wIRC.IRC
         public void Send(string input)
         {
             _client.SendCommand(input, true);
+        }
+
+        public static void Disconnect(WIrcClient client)
+        {
+            client.Disconnect();
         }
     }
 }
