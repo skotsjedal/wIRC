@@ -35,7 +35,7 @@ namespace wIRC.IRC
             {
                 ctcp = (CTCP) Enum.Parse(typeof (CTCP), ctcpCommand, false);
             }
-            catch (ArgumentException ex)
+            catch (ArgumentException)
             {
                 IrcUtils.WriteOutputLine("CTCP command {0} not supported yet", ctcpCommand);
                 return;

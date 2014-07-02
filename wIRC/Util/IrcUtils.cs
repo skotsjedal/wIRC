@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Diagnostics;
 using System.Linq;
 using wIRC.Models;
@@ -42,12 +43,12 @@ namespace wIRC.Util
 
         public static void WriteOutputLine(string output)
         {
-            WriteOutput(output+Environment.NewLine);
+            WriteOutput(output + Environment.NewLine);
         }
 
         public static void WriteOutput(string output, params object[] values)
         {
-            Console.WriteLine(output, values);
+            Console.Write(output, values);
         }
 
         public static void WriteOutputLine(string output, params object[] values)
@@ -60,6 +61,13 @@ namespace wIRC.Util
             var parsed =
                 String.Concat(text.ToList().Select(c => string.Format("{0}_{1} ", c, Convert.ToByte(c).ToString("x"))));
             Debug.WriteLine(parsed);
+        }
+
+        public static bool CheckArgs(IList args, int i, string source = null)
+        {
+            if (args.Count >= i) return true;
+            WriteOutputLine("Insufficient parameters for command {0}", source);
+            return false;
         }
     }
 }

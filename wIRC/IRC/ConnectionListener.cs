@@ -19,6 +19,11 @@ namespace wIRC.IRC
                 throw new NullReferenceException("IrcClient or TcpClient is null");
             }
 
+            if (!TcpClient.Connected)
+            {
+                throw new InvalidProgramException("TcpClient not connected after starting listener");
+            }
+
             var reader = new StreamReader(TcpClient.GetStream());
             try
             {
@@ -40,12 +45,13 @@ namespace wIRC.IRC
                     }
                 }
             }
-            catch (ThreadAbortException ex)
+            catch (ThreadAbortException)
             {
                 IrcUtils.WriteOutputLine("Listener: Client shut down connection");
                 return;
             }
             IrcUtils.WriteOutputLine("Listener: Client lost connection");
+            IrcClient.NotifyLostConnection();
         }
     }
 }

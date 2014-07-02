@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace wIRC.Models
 {
-    public class IrcResponse
+    public struct IrcResponse
     {
         public string Source { get; set; }
 

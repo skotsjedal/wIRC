@@ -14,24 +14,24 @@ namespace wIRC
 {
     internal class Program
     {
-        private static readonly List<WIrcClient> _clients = new List<WIrcClient>();
+        private static readonly List<WIrcClient> Clients = new List<WIrcClient>();
         private static WIrcClient _active;
+        private static string _quitMessage;
 
         private static void Main(string[] args)
         {
             var running = true;
-            
+
             foreach (Server server in Conf.IrcConfig.Servers)
             {
-                var wIrcClient = new WIrcClient(server.Endpoint, server.Port)
+                var wIrcClient = new WIrcClient(server.Endpoint, server.Port, server.Name)
                 {
                     Nick = server.Nick,
-                    Name = server.Name,
                     AutoJoinChannels = server.ChannelsList
                 };
                 wIrcClient.Connect();
                 _active = wIrcClient;
-                _clients.Add(wIrcClient);
+                Clients.Add(wIrcClient);
             }
 
             while (running)
@@ -46,16 +46,29 @@ namespace wIRC
                     switch (command)
                     {
                         case "msg":
-                            _active.Message(parts.ElementAt(1), string.Join(" ", parts.Skip(2)));
+                            if (IrcUtils.CheckArgs(parts, 3))
+                            {
+                                // /msg foo bar
+                                _active.Message(parts.ElementAt(1), string.Join(" ", parts.Skip(2)));
+                            }
                             break;
                         case "ctcp":
-                            _active.SendCtcpRequest(parts.ElementAt(1), string.Join(" ", parts.Skip(2)));
+                            if (IrcUtils.CheckArgs(parts, 3))
+                            {
+                                // ctcp foo version
+                                _active.SendCtcpRequest(parts.ElementAt(1), string.Join(" ", parts.Skip(2)));
+                            }
                             break;
                         case "exit":
+                            _quitMessage = string.Join(" ", parts.Skip(1));
                             running = false;
                             break;
                         case "quit":
                             _active.Disconnect(string.Join(" ", parts.Skip(1)));
+                            break;
+                        case "server":
+                        case "connect":
+
                             break;
                         default:
                             IrcUtils.WriteOutput("Unknown command {0}\r\n", command);
@@ -75,7 +88,7 @@ namespace wIRC
                 _active.Chat(input);
             }
 
-            _clients.ForEach(WIrcClient.Disconnect);
+            Clients.ForEach(c => c.Disconnect(_quitMessage));
         }
     }
 }
