@@ -1,13 +1,18 @@
 ﻿using System;
 using System.Collections;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using wIRC.Models;
 
 namespace wIRC.Util
 {
     public static class IrcUtils
     {
+        private static readonly object WriteLock = new object();
+        public static TextWriter Writer { get; set; }
+
         public static IrcResponse ParseIrcResponse(string response)
         {
             var ircResponse = new IrcResponse {Response = response};
@@ -35,20 +40,19 @@ namespace wIRC.Util
 
             return ircResponse;
         }
-
-        public static void WriteOutput(string output)
-        {
-            Console.Write(output);
-        }
-
-        public static void WriteOutputLine(string output)
-        {
-            WriteOutput(output + Environment.NewLine);
-        }
-
+        
         public static void WriteOutput(string output, params object[] values)
         {
-            Console.Write(output, values);
+            output = string.Format(output, values);
+            if (Writer != null)
+            {
+                lock (WriteLock)
+                {
+                    Writer.Write(output);
+                }
+                return;
+            }
+            Console.Write(output);
         }
 
         public static void WriteOutputLine(string output, params object[] values)

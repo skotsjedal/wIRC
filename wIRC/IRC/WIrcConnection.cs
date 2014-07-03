@@ -17,10 +17,10 @@ namespace wIRC.IRC
         Disconnecting
     }
 
-    public class WIrcClient : IDisposable
+    public class WIrcConnection : IDisposable
     {
         private string _activeTarget;
-        private ConnectionState _state;
+        private ConnectionState _state = ConnectionState.Disconnected;
 
         public ConnectionState State
         {
@@ -86,14 +86,13 @@ namespace wIRC.IRC
 
         public CtcpHandler CtcpHandler { get; private set; }
 
-        public WIrcClient(string endpoint, int port, string name = null)
+        public WIrcConnection(string endpoint, int port, string name = null)
         {
             name = string.IsNullOrWhiteSpace(name) ? endpoint : name;
             Nick = Conf.IrcConfig.DefaultNick;
             Endpoint = endpoint;
             Port = port;
             Name = name;
-            State = ConnectionState.Disconnected;
         }
 
         public void Connect()
@@ -103,7 +102,7 @@ namespace wIRC.IRC
             CtcpHandler = new CtcpHandler(_client);
             State = ConnectionState.Connecting;
 
-            var listener = new ConnectionListener {TcpClient = _client, IrcClient = this};
+            var listener = new ConnectionListener {TcpClient = _client, IrcConnection = this};
 
             _listenerThread = new Thread(listener.Listen);
             _listenerThread.Start();
@@ -123,10 +122,22 @@ namespace wIRC.IRC
             _client.SendCommand(String.Format("NICK {0}", nick));
         }
 
+
+        /// <summary>
+        /// Disconnect from server, also disposes the underlying managed data
+        /// </summary>
+        /// <param name="message"></param>
         public void Disconnect(string message = null)
         {
-            if (State == ConnectionState.Disconnected)
+            if (State == ConnectionState.Disconnected || State == ConnectionState.Disconnecting)
+            {
+                // Safety precaution
+                if (!_client.Connected) return;
+                _client.Close();
+                Debug.WriteLine(
+                    "ERROR, connection still alive at call to disconnect while ircconnection is disconnected");
                 return;
+            }
 
             State = ConnectionState.Disconnecting;
             IrcUtils.WriteOutputLine("Disconnecting");
@@ -180,10 +191,10 @@ namespace wIRC.IRC
                     var target = parsedResponse.Args.First();
                     if (target.Equals(Nick))
                     {
-                        IrcUtils.WriteOutput("-{0}- {1}", parsedResponse.Nick, parsedResponse.Args.Last());
+                        IrcUtils.WriteOutputLine("-{0}- {1}", parsedResponse.Nick, parsedResponse.Args.Last());
                         break;
                     }
-                    IrcUtils.WriteOutput("-{0}:{1}- {2}", parsedResponse.Nick, target, parsedResponse.Args.Last());
+                    IrcUtils.WriteOutputLine("-{0}:{1}- {2}", parsedResponse.Nick, target, parsedResponse.Args.Last());
                 }
                     break;
                 case "PRIVMSG":
@@ -196,14 +207,14 @@ namespace wIRC.IRC
                     var target = parsedResponse.Args.First();
                     if (target.Equals(Nick))
                     {
-                        IrcUtils.WriteOutput("*{0}* {1}", parsedResponse.Nick, parsedResponse.Args.Last());
+                        IrcUtils.WriteOutputLine("*{0}* {1}", parsedResponse.Nick, parsedResponse.Args.Last());
                         break;
                     }
-                    IrcUtils.WriteOutput("{0} <{1}> {2}", target, parsedResponse.Nick, parsedResponse.Args.Last());
+                    IrcUtils.WriteOutputLine("{0} <{1}> {2}", target, parsedResponse.Nick, parsedResponse.Args.Last());
                 }
                     break;
                 case "421":
-                    IrcUtils.WriteOutput(parsedResponse.Args.Last());
+                    IrcUtils.WriteOutputLine(parsedResponse.Args.Last());
                     break;
                 case "PING":
                     _client.SendCommand(String.Format("PONG {0}", parsedResponse.Args.First()));
@@ -225,7 +236,7 @@ namespace wIRC.IRC
             }
         }
 
-        private void Join(string channel)
+        public void Join(string channel)
         {
             if (String.IsNullOrWhiteSpace(channel))
                 return;
@@ -243,6 +254,7 @@ namespace wIRC.IRC
         {
             _activeTarget = target;
             _client.SendCommand(String.Format("PRIVMSG {0} :{1}", target, message), true);
+            IrcUtils.WriteOutputLine("{0} <{1}> {2}", _activeTarget, Nick, message);
         }
 
         public void Chat(string message)
@@ -252,9 +264,13 @@ namespace wIRC.IRC
             Message(_activeTarget, message);
         }
 
-        public static void Disconnect(WIrcClient client)
+        /// <summary>
+        /// Disconnects the connection, see <see cref="Disconnect(string)"/>
+        /// </summary>
+        /// <param name="connection">connection to disconnect</param>
+        public static void Disconnect(WIrcConnection connection)
         {
-            client.Disconnect();
+            connection.Disconnect();
         }
 
         public void SendCtcpRequest(string destination, string command)
@@ -292,6 +308,14 @@ namespace wIRC.IRC
             var message = String.Format("Unexpected loss of connection to server {0}", Name);
             Debug.WriteLine(message);
             IrcUtils.WriteOutputLine(message);
+        }
+
+        public void ChangeServer(string endpoint, int port)
+        {
+            Disconnect();
+            Endpoint = endpoint;
+            Port = port;
+            Connect();
         }
     }
 }

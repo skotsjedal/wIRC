@@ -10,13 +10,13 @@ namespace wIRC.IRC
     public class ConnectionListener
     {
         public TcpClient TcpClient { get; set; }
-        public WIrcClient IrcClient { get; set; }
+        public WIrcConnection IrcConnection { get; set; }
 
         public async void Listen()
         {
-            if (IrcClient == null || TcpClient == null)
+            if (IrcConnection == null || TcpClient == null)
             {
-                throw new NullReferenceException("IrcClient or TcpClient is null");
+                throw new NullReferenceException("IrcConnection or TcpClient is null");
             }
 
             if (!TcpClient.Connected)
@@ -25,33 +25,37 @@ namespace wIRC.IRC
             }
 
             var reader = new StreamReader(TcpClient.GetStream());
-            try
+
+            while (true)
             {
-                while (true)
+                if (!TcpClient.Connected)
+                    break;
+
+                string response;
+                try
                 {
-                    if (!TcpClient.Connected)
-                        break;
+                    response = await reader.ReadLineAsync();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // ReadLineAsync won't listen to cancellationtokens
+                    IrcUtils.WriteOutputLine("Listener: Client shut down connection");
+                    return;
+                }
 
-                    var response = await reader.ReadLineAsync();
-
-                    if (response != null)
-                    {
-                        Debug.WriteLine(string.Format("<INN> {0}", response));
-                        IrcClient.HandleResponse(response);
-                    }
-                    else
-                    {
-                        break;
-                    }
+                if (response != null)
+                {
+                    Debug.WriteLine(string.Format("<INN> {0}", response));
+                    IrcConnection.HandleResponse(response);
+                }
+                else
+                {
+                    break;
                 }
             }
-            catch (ThreadAbortException)
-            {
-                IrcUtils.WriteOutputLine("Listener: Client shut down connection");
-                return;
-            }
+
             IrcUtils.WriteOutputLine("Listener: Client lost connection");
-            IrcClient.NotifyLostConnection();
+            IrcConnection.NotifyLostConnection();
         }
     }
 }
